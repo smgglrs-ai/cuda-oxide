@@ -52,18 +52,24 @@ pub fn build_entry_optimization_hints(hints: &OptimizationHints) -> Option<Attri
     }
 }
 
-/// Builds a tile-ir `OptimizationHints` attribute for load/store operations.
+/// Builds a tile-ir `OptimizationHints` attribute for load operations.
 ///
 /// Merges per-op call-site hint_params (latency, allow_tma) with entry-level
 /// hints that apply to individual loads (vec_width). Entry-level arch hints
 /// such as occupancy are NOT merged here — they live on the entry function.
+///
+/// Set `is_load = true` for LoadViewTko / LoadPtrTko so that the entry-level
+/// `vec_width` hint is injected. Store operations must pass `false`.
 pub fn build_load_store_hints(
     hints: &OptimizationHints,
     mut hint_params: HashMap<String, i32>,
+    is_load: bool,
 ) -> Option<Attribute> {
-    if let Some(target_arch) = hints.target_gpu_name.as_deref() {
-        if let Some(vw) = hints.get_sm_hints(target_arch).and_then(|h| h.vec_width) {
-            hint_params.entry("vec_width".to_string()).or_insert(vw);
+    if is_load {
+        if let Some(target_arch) = hints.target_gpu_name.as_deref() {
+            if let Some(vw) = hints.get_sm_hints(target_arch).and_then(|h| h.vec_width) {
+                hint_params.entry("vec_width".to_string()).or_insert(vw);
+            }
         }
     }
     if hint_params.is_empty() {
