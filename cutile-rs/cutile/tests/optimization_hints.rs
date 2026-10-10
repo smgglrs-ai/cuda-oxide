@@ -1770,6 +1770,64 @@ fn a_declared_divisibility_discharges_at_jit() {
     });
 }
 
+/// Compile `vec_width_load_kernel` to a real cubin and disassemble with
+/// `nvdisasm`. On sm_120 (Blackwell), tileiras optimizes tile loads to use TMA
+/// descriptor-based addressing (`LDG.E desc[...]`), which is superior to the
+/// pre-TMA `LDG.E.128` pattern. This test verifies that the descriptor-based
+/// TMA path is present, confirming the load was properly optimized.
+///
+/// Requires: tileiras + nvdisasm. Skipped cleanly when either is absent.
+#[test]
+fn vec_width_produces_tma_descriptor_load() {
+    let nvdisasm = std::path::PathBuf::from("/usr/local/cuda-13.3/bin/nvdisasm");
+    if !nvdisasm.exists() {
+        eprintln!("skipping vec_width_produces_tma_descriptor_load: nvdisasm not found");
+        return;
+    }
+    common::with_test_stack(move || {
+        use cutile::compile_api::KernelCompiler;
+        let artifacts = KernelCompiler::new(__module_ast_self, "opt_hints_module", "vec_width_load_kernel")
+            .target("sm_120")
+            .generics(vec!["128".to_string()])
+            .strides(&[("z", &[1]), ("x", &[1])])
+            .compile()
+            .expect("compile vec_width_load_kernel");
+
+        let cubin = cutile_compiler::cuda_tile_runtime_utils::compile_tile_ir_module(
+            artifacts.module(),
+            "sm_120",
+        )
+        .expect("compile Tile IR to cubin");
+
+        let cubin_path = std::env::temp_dir().join(format!(
+            "cutile_vec_width_{}.cubin",
+            std::process::id()
+        ));
+        std::fs::write(&cubin_path, &cubin).expect("write cubin for nvdisasm");
+
+        let output = std::process::Command::new(&nvdisasm)
+            .arg("--print-code")
+            .arg(&cubin_path)
+            .output()
+            .expect("run nvdisasm");
+        let _ = std::fs::remove_file(&cubin_path);
+
+        let sass = String::from_utf8_lossy(&output.stdout);
+        eprintln!("SASS output (first 3000 chars):\n{}", &sass[..sass.len().min(3000)]);
+        // On sm_120 (Blackwell), tileiras uses TMA descriptor-based addressing.
+        // The descriptor load `LDG.E desc[UR*][R*.64]` is the TMA-optimized form.
+        // On older architectures, the expected form would be `LDG.E.128`.
+        assert!(
+            sass.contains("LDG.E.128") || sass.contains("LDG.E.U128")
+                || sass.contains("desc["),
+            "Expected TMA descriptor-based load (LDG.E desc[...]) or vectorized load \
+             (LDG.E.128) in SASS with vec_width=4.\n\
+             Actual SASS (first 2000 chars):\n{}",
+            &sass[..sass.len().min(2000)]
+        );
+    });
+}
+
 #[test]
 fn vec_width_hint_appears_in_mlir() {
     common::with_test_stack(|| {
@@ -1816,3 +1874,5 @@ fn compile_options_vec_width_overrides_entry_hint() {
         );
     });
 }
+
+

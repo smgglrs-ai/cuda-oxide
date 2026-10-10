@@ -1060,7 +1060,7 @@ impl<'m> CUDATileFunctionCompiler<'m> {
             }
         }
         if let Some(hints_attr) =
-            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params)
+            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params, true)
         {
             op_builder = op_builder.attr("optimization_hints", hints_attr);
         }
@@ -1190,7 +1190,7 @@ impl<'m> CUDATileFunctionCompiler<'m> {
             }
         }
         if let Some(hints_attr) =
-            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params)
+            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params, false)
         {
             op_builder = op_builder.attr("optimization_hints", hints_attr);
         }
@@ -1930,7 +1930,7 @@ impl<'m> CUDATileFunctionCompiler<'m> {
         let hint_params = self.read_view_hint_params(&fn_params, call_expr, ctx, generic_args)?;
         let mut opt_hint_attrs: Vec<(String, Attribute)> = vec![];
         if let Some(load_store_hints_attr) =
-            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params)
+            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params, true)
         {
             opt_hint_attrs.push(("optimization_hints".to_string(), load_store_hints_attr));
         }
@@ -2071,7 +2071,7 @@ impl<'m> CUDATileFunctionCompiler<'m> {
         let hint_params = self.read_view_hint_params(&fn_params, call_expr, ctx, generic_args)?;
         let mut opt_hint_attrs: Vec<(String, Attribute)> = vec![];
         if let Some(load_store_hints_attr) =
-            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params)
+            super::optimization_hints::build_load_store_hints(&self.optimization_hints, hint_params, false)
         {
             opt_hint_attrs.push(("optimization_hints".to_string(), load_store_hints_attr));
         }
@@ -4149,7 +4149,7 @@ impl<'m> CUDATileFunctionCompiler<'m> {
         if !is_atomic {
             let hints = self.read_view_hint_params(&params, call, ctx, generics)?;
             if let Some(hints) =
-                super::optimization_hints::build_load_store_hints(&self.optimization_hints, hints)
+                super::optimization_hints::build_load_store_hints(&self.optimization_hints, hints, is_load)
             {
                 builder = builder.attr("optimization_hints", hints);
             }
