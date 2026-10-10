@@ -281,6 +281,12 @@ impl TargetCapabilities {
                                             | Opcode::StorePtrTko
                                     ) && (1..=10).contains(n)
                                 }
+                                ("vec_width", Attribute::Integer(n, _)) => {
+                                    matches!(
+                                        op.opcode,
+                                        Opcode::LoadViewTko | Opcode::LoadPtrTko
+                                    ) && matches!(n, 1 | 2 | 4)
+                                }
                                 _ => false,
                             };
                             if !valid {

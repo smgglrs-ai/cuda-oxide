@@ -155,6 +155,18 @@ mod opt_hints_module {
     }
 
     #[cutile::entry(optimization_hints = (
+        sm_120 = (vec_width = 4,),
+    ))]
+    fn vec_width_load_kernel<const S: [i32; 1]>(
+        z: &mut Tensor<f32, S>,
+        x: &Tensor<f32, { [-1] }>,
+    ) {
+        let part = x.partition(shape!(S));
+        let tile = part.load([0i32]);
+        z.store(tile);
+    }
+
+    #[cutile::entry(optimization_hints = (
         sm_120 = (
             occupancy = 4,
             num_cta_in_cga = 2,
@@ -1754,6 +1766,53 @@ fn a_declared_divisibility_discharges_at_jit() {
             artifacts.launch_checks().is_empty(),
             "an entailed obligation must not also emit a launch check: {:?}",
             artifacts.launch_checks()
+        );
+    });
+}
+
+#[test]
+fn vec_width_hint_appears_in_mlir() {
+    common::with_test_stack(|| {
+        let mlir = common::compile_to_ir(
+            __module_ast_self,
+            "opt_hints_module",
+            "vec_width_load_kernel",
+            &["128".to_string()],
+            &[("z", &[1]), ("x", &[1])],
+            &[],
+            &[],
+            None,
+            &CompileOptions::default(),
+        )
+        .expect("Failed to compile vec_width_load_kernel");
+        println!("{mlir}");
+        assert!(
+            mlir.contains("vec_width = 4"),
+            "Expected vec_width=4 on the load operation optimization_hints.\nMLIR:\n{mlir}"
+        );
+    });
+}
+
+#[test]
+fn compile_options_vec_width_overrides_entry_hint() {
+    common::with_test_stack(|| {
+        let options = CompileOptions::default().vec_width(2);
+        let mlir = common::compile_to_ir(
+            __module_ast_self,
+            "opt_hints_module",
+            "vec_width_load_kernel",
+            &["128".to_string()],
+            &[("z", &[1]), ("x", &[1])],
+            &[],
+            &[],
+            None,
+            &options,
+        )
+        .expect("Failed to compile vec_width_load_kernel with CompileOptions");
+        println!("{mlir}");
+        assert!(
+            mlir.contains("vec_width = 2"),
+            "Expected CompileOptions vec_width=2 to override the entry-level hint.\nMLIR:\n{mlir}"
         );
     });
 }
