@@ -275,13 +275,21 @@ impl OptimizationHints {
     }
 
     pub fn parse(expr: &Expr, target_gpu_name: String) -> Result<OptimizationHints, JITError> {
-        let Expr::Tuple(opt_hints) = expr else {
-            return SourceLocation::unknown()
-                .jit_error_result("expected a tuple expression for optimization hints");
+        // Accept both `(sm_120 = (...),)` (1-tuple with trailing comma) and the
+        // parenthesized form `(sm_120 = (...))` (single assignment in parens).
+        // In Rust's syn grammar, (x,) is Tuple but (x) is Paren — both are valid
+        // user spellings for a single architecture hint.
+        let elems: Vec<&Expr> = match expr {
+            Expr::Tuple(t) => t.elems.iter().collect(),
+            Expr::Paren(p) => vec![&*p.expr],
+            _ => {
+                return SourceLocation::unknown()
+                    .jit_error_result("expected a tuple expression for optimization hints");
+            }
         };
         let mut result = OptimizationHints::empty();
         result.target_gpu_name = Some(target_gpu_name);
-        for sm_key_val in &opt_hints.elems {
+        for sm_key_val in elems {
             let (opt_key, opt_value) = Self::parse_key_value(sm_key_val)?;
             {
                 if !opt_key.starts_with("sm_") {
@@ -290,13 +298,15 @@ impl OptimizationHints {
                         sm_key_val.to_token_stream()
                     ));
                 }
-                let Expr::Tuple(hints_tuple) = opt_value else {
-                    return SourceLocation::unknown().jit_error_result(
+                let hint_elems: Vec<&Expr> = match &opt_value {
+                    Expr::Tuple(t) => t.elems.iter().collect(),
+                    Expr::Paren(p) => vec![&*p.expr],
+                    _ => return SourceLocation::unknown().jit_error_result(
                         "expected a tuple expression for architecture-specific optimization hints",
-                    );
+                    ),
                 };
                 let mut sm_hints_result = SMHints::new(opt_key.clone());
-                for hint_key_val in hints_tuple.elems.iter() {
+                for hint_key_val in hint_elems {
                     let (key, hints) = Self::parse_key_value(hint_key_val)?;
                     match key.as_str() {
                         "num_cta_in_cga" => sm_hints_result.set_num_cta_in_cga(&hints)?,
