@@ -54,13 +54,18 @@ pub fn build_entry_optimization_hints(hints: &OptimizationHints) -> Option<Attri
 
 /// Builds a tile-ir `OptimizationHints` attribute for load/store operations.
 ///
-/// Only emits per-op call-site hint_params (latency, allow_tma, etc.).
-/// Entry-level arch hints are NOT merged here — they are applied at the entry
-/// function level via `build_entry_optimization_hints`.
+/// Merges per-op call-site hint_params (latency, allow_tma) with entry-level
+/// hints that apply to individual loads (vec_width). Entry-level arch hints
+/// such as occupancy are NOT merged here — they live on the entry function.
 pub fn build_load_store_hints(
     hints: &OptimizationHints,
-    hint_params: HashMap<String, i32>,
+    mut hint_params: HashMap<String, i32>,
 ) -> Option<Attribute> {
+    if let Some(target_arch) = hints.target_gpu_name.as_deref() {
+        if let Some(vw) = hints.get_sm_hints(target_arch).and_then(|h| h.vec_width) {
+            hint_params.entry("vec_width".to_string()).or_insert(vw);
+        }
+    }
     if hint_params.is_empty() {
         return None;
     }
