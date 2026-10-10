@@ -131,3 +131,6 @@ mod audit_frontend_errors;
 
 #[path = "gpu/audit_module_consts.rs"]
 mod audit_module_consts;
+
+#[path = "gpu/vec_width_correctness.rs"]
+mod vec_width_correctness;
