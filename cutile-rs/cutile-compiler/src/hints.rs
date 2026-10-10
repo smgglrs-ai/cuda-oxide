@@ -88,6 +88,11 @@ impl SMHints {
                 .jit_error_result("vec_width must be 1, 2, or 4");
         }
         self.vec_width = Some(v);
+        // Propagate as max_divisibility if not already set: v elements align to
+        // v * sizeof(f32) = v * 4 bytes → enables ld.global.v{v}.f32 in tileiras.
+        if self.max_divisibility.is_none() {
+            self.max_divisibility = Some(v);
+        }
         Ok(())
     }
 }
@@ -364,6 +369,9 @@ impl OptimizationHints {
         }
         if let Some(vec_width) = options.vec_width {
             sm_hints.vec_width = Some(vec_width);
+            if sm_hints.max_divisibility.is_none() {
+                sm_hints.max_divisibility = Some(vec_width);
+            }
         }
     }
 }
