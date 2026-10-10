@@ -23,6 +23,10 @@ pub struct SMHints {
     pub occupancy: Option<i32>,
     pub max_divisibility: Option<i32>,
     pub num_worker_warps_per_cta: Option<i32>,
+    /// Vectorization width for global memory loads: 1, 2, or 4 elements per
+    /// instruction. When set, the compiler inserts a `vec_width` hint on every
+    /// tile load in the kernel, requesting `ld.global.v{N}.f32` emission.
+    pub vec_width: Option<i32>,
 }
 
 impl SMHints {
@@ -33,6 +37,7 @@ impl SMHints {
             occupancy: None,
             max_divisibility: None,
             num_worker_warps_per_cta: None,
+            vec_width: None,
         }
     }
 
@@ -69,6 +74,20 @@ impl SMHints {
                 .jit_error_result("num_worker_warps_per_cta hint has already been set");
         }
         self.num_worker_warps_per_cta = Some(get_int_hint(hint)?);
+        Ok(())
+    }
+
+    pub fn set_vec_width(&mut self, hint: &Expr) -> Result<(), JITError> {
+        if self.vec_width.is_some() {
+            return SourceLocation::unknown()
+                .jit_error_result("vec_width hint has already been set");
+        }
+        let v = get_int_hint(hint)?;
+        if !matches!(v, 1 | 2 | 4) {
+            return SourceLocation::unknown()
+                .jit_error_result("vec_width must be 1, 2, or 4");
+        }
+        self.vec_width = Some(v);
         Ok(())
     }
 }
@@ -118,6 +137,7 @@ pub struct CompileOptions {
     pub num_cta_in_cga: Option<i32>,
     pub max_divisibility: Option<i32>,
     pub num_worker_warps_per_cta: Option<i32>,
+    pub vec_width: Option<i32>,
     /// `tileiras` optimization level (`--opt-level`). `None` means the
     /// default: 3, or 0 when `device_debug` is set.
     pub opt_level: Option<u8>,
@@ -143,6 +163,7 @@ impl Default for CompileOptions {
             num_cta_in_cga: None,
             max_divisibility: None,
             num_worker_warps_per_cta: None,
+            vec_width: None,
             opt_level: None,
             device_debug: env!("CUTILE_BUILD_DEBUG_INFO") == "full",
             lineinfo: env!("CUTILE_BUILD_DEBUG_INFO") == "line",
@@ -184,6 +205,11 @@ impl CompileOptions {
 
     pub fn num_worker_warps_per_cta(mut self, num_worker_warps_per_cta: i32) -> Self {
         self.num_worker_warps_per_cta = Some(num_worker_warps_per_cta);
+        self
+    }
+
+    pub fn vec_width(mut self, vec_width: i32) -> Self {
+        self.vec_width = Some(vec_width);
         self
     }
 
@@ -274,6 +300,7 @@ impl OptimizationHints {
                         "num_worker_warps_per_cta" => {
                             sm_hints_result.set_num_worker_warps_per_cta(&hints)?
                         }
+                        "vec_width" => sm_hints_result.set_vec_width(&hints)?,
                         "allow_tma" | "latency" => {
                             return SourceLocation::unknown().jit_error_result(&format!(
                                     "'{key}' is a per-op hint and cannot be set at the entry level. \
@@ -311,6 +338,7 @@ impl OptimizationHints {
             && options.num_cta_in_cga.is_none()
             && options.max_divisibility.is_none()
             && options.num_worker_warps_per_cta.is_none()
+            && options.vec_width.is_none()
         {
             return;
         }
@@ -333,6 +361,9 @@ impl OptimizationHints {
         }
         if let Some(num_worker_warps_per_cta) = options.num_worker_warps_per_cta {
             sm_hints.num_worker_warps_per_cta = Some(num_worker_warps_per_cta);
+        }
+        if let Some(vec_width) = options.vec_width {
+            sm_hints.vec_width = Some(vec_width);
         }
     }
 }
