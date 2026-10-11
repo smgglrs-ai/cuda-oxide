@@ -157,6 +157,7 @@ pub(super) struct ModuleExportState<'a> {
     /// used for NVVM annotations/version nodes; debug-info nodes will use the
     /// same counter so the exporter never has to guess which IDs are free.
     next_metadata_id: usize,
+    pub(super) invariant_load_md_id: Option<usize>,
     /// Which debug metadata tier this export should emit.
     pub(super) debug_kind: DebugKind,
     /// Where function-local statics are retained (per the consuming LLVM).
@@ -258,6 +259,7 @@ impl<'a> ModuleExportState<'a> {
             global_symbols: FxHashMap::default(),
             global_sources: FxHashMap::default(),
             next_metadata_id: 0,
+            invariant_load_md_id: None,
             debug_kind,
             debug_function_local_static_placement,
             nvvm_ir_dialect,
@@ -306,6 +308,15 @@ impl<'a> ModuleExportState<'a> {
     pub(super) fn alloc_metadata_id(&mut self) -> usize {
         let id = self.next_metadata_id;
         self.next_metadata_id += 1;
+        id
+    }
+
+    pub(super) fn get_invariant_load_md_id(&mut self) -> usize {
+        if let Some(id) = self.invariant_load_md_id {
+            return id;
+        }
+        let id = self.alloc_metadata_id();
+        self.invariant_load_md_id = Some(id);
         id
     }
 

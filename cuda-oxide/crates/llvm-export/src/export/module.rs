@@ -730,7 +730,13 @@ pub(super) fn export_module_with_externs_impl(
         emit_nvvmir_version(&mut output, &mut state, config.nvvmir_version());
     }
 
-    // 9. DWARF metadata (if requested and source locations exist)
+    // 9. Invariant load metadata
+    if let Some(md_id) = state.invariant_load_md_id {
+        writeln!(&mut output).unwrap();
+        writeln!(&mut output, "!{md_id} = !{{}}").unwrap();
+    }
+
+    // 10. DWARF metadata (if requested and source locations exist)
     if state.has_debug_metadata() {
         writeln!(&mut output).unwrap();
         state.emit_debug_metadata(&mut output);
@@ -875,6 +881,12 @@ pub(super) fn export_module_to_string_with_config(
     if config.emit_nvvmir_version() {
         writeln!(&mut output).unwrap();
         emit_nvvmir_version(&mut output, &mut state, config.nvvmir_version());
+    }
+
+    // Invariant load metadata
+    if let Some(md_id) = state.invariant_load_md_id {
+        writeln!(&mut output).unwrap();
+        writeln!(&mut output, "!{md_id} = !{{}}").unwrap();
     }
 
     // Emit DWARF line-table metadata if debug export requested it and at least

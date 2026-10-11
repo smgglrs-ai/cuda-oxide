@@ -611,7 +611,8 @@ impl Verify for MirMemmoveOp {
     format,
     interfaces = [NOpdsInterface<1>, OneOpdInterface, NResultsInterface<1>, OneResultInterface],
     attributes = (
-        mir_load_volatile: IntegerAttr
+        mir_load_volatile: IntegerAttr,
+        mir_load_invariant: IntegerAttr
     )
 )]
 pub struct MirLoadOp;
@@ -637,6 +638,16 @@ impl MirLoadOp {
     pub fn set_volatile(&self, ctx: &mut Context, volatile: bool) {
         let attr = bool_integer_attr(ctx, volatile);
         self.set_attr_mir_load_volatile(ctx, attr);
+    }
+
+    pub fn is_invariant(&self, ctx: &Context) -> bool {
+        self.get_attr_mir_load_invariant(ctx)
+            .is_some_and(|attr| attr.value().to_u64() != 0)
+    }
+
+    pub fn set_invariant(&self, ctx: &mut Context, invariant: bool) {
+        let attr = bool_integer_attr(ctx, invariant);
+        self.set_attr_mir_load_invariant(ctx, attr);
     }
 }
 

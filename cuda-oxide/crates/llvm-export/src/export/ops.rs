@@ -737,7 +737,12 @@ impl<'a> ModuleExportState<'a> {
         if let Some(align) = crate::ops::op_alignment(self.ctx, op.get_operation())
             .or_else(|| self.natural_alignment(ty))
         {
-            writeln!(output, ", align {align}").unwrap();
+            if crate::ops::op_invariant(self.ctx, op.get_operation()) {
+                let md_id = self.get_invariant_load_md_id();
+                writeln!(output, ", align {align}, !invariant.load !{md_id}").unwrap();
+            } else {
+                writeln!(output, ", align {align}").unwrap();
+            }
         } else {
             writeln!(output).unwrap();
         }

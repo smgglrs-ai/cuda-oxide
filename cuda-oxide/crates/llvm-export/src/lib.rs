@@ -1045,6 +1045,7 @@ pub mod ops {
             *entries = next;
             true
         }
+    const OP_INVARIANT_KEY: &str = "cuda_oxide_op_invariant";
 
         fn type_is_bounded(ty: &DebugLocalTypeKind, depth: usize, entries: &mut usize) -> bool {
             if depth > MAX_DEBUG_TYPE_DEPTH || !charge(entries, 1) {
@@ -2519,6 +2520,11 @@ pub mod ops {
         pub fn values(&self, ctx: &Context) -> Vec<Value> {
             self.get_operation().deref(ctx).operands().collect()
         }
+    pub fn set_op_invariant(ctx: &mut Context, op: Ptr<Operation>, invariant: bool) {
+        let key = Identifier::try_new(OP_INVARIANT_KEY.to_string()).expect("valid identifier");
+            .set(key, BoolAttr::new(invariant));
+    pub fn op_invariant(ctx: &Context, op: Ptr<Operation>) -> bool {
+        let key = Identifier::try_new(OP_INVARIANT_KEY.to_string()).expect("valid identifier");
     }
 
     impl Verify for DebugValueListOp {
