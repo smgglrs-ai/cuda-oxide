@@ -25,7 +25,14 @@ mod cluster;
 mod debug;
 mod generated;
 mod grid;
+mod mbarrier;
 mod memory;
+mod mma_sync;
+mod stmatrix;
+mod tcgen05;
+mod thread;
+mod tma;
+mod warp;
 mod wgmma;
 
 use pliron::context::Context;
@@ -37,7 +44,14 @@ pub use cluster::*;
 pub use debug::*;
 pub use generated::*;
 pub use grid::*;
+pub use mbarrier::*;
 pub use memory::*;
+pub use mma_sync::*;
+pub use stmatrix::*;
+pub use tcgen05::*;
+pub use thread::*;
+pub use tma::*;
+pub use warp::*;
 pub use wgmma::*;
 
 /// Register all NVVM dialect operations with the context.
@@ -51,5 +65,8 @@ pub fn register(ctx: &mut Context) {
     generated::register(ctx);
     grid::register(ctx);
     wgmma::register(ctx);
+    tcgen05::register(ctx);
+    mma_sync::register(ctx);
+    stmatrix::register(ctx);
     debug::register(ctx);
 }

@@ -37,7 +37,8 @@ use dialect_mir::ops::{
     MirStorageLiveOp, MirStoreOp, MirSubOp, MirUndefOp, MirUnreachableOp, MirUnrollHintOp,
 };
 use dialect_nvvm::ops::{
-    AssertFailOp, CvtaGenericToSharedOffsetOp, InlinePtxOp, NvvmAtomicCmpxchgOp, NvvmAtomicFenceOp,
+    AssertFailOp, CvtaGenericToSharedOffsetOp, InlinePtxOp, MmaSyncM16N8K16F32F16Op,
+    NvvmAtomicCmpxchgOp, NvvmAtomicFenceOp,
     NvvmAtomicLoadOp, NvvmAtomicRmwOp, NvvmAtomicStoreOp, ReadPtxSregClusterIdxOp,
     ReadPtxSregNclusterIdOp, VprintfOp, WgmmaMakeSmemDescOp, WgmmaMmaGroupM64N64K16F32Bf16Op,
     WgmmaMmaGroupValuesM64N64K8F32Tf32Op, WgmmaMmaGroupValuesM64N64K16F32Bf16Op,
@@ -1336,6 +1337,23 @@ impl MirToLlvmConversion for NvvmAtomicRmwOp {
 }
 
 #[op_interface_impl]
+#[op_interface_impl]
+impl MirToLlvmConversion for MmaSyncM16N8K16F32F16Op {
+    fn convert(
+        &self,
+        ctx: &mut Context,
+        rewriter: &mut DialectConversionRewriter,
+        operands_info: &OperandsInfo,
+    ) -> Result<()> {
+        super::intrinsics::mma_sync::convert_mma_sync_m16n8k16_f32_f16(
+            ctx,
+            rewriter,
+            self.get_operation(),
+            operands_info,
+        )
+    }
+}
+
 impl MirToLlvmConversion for NvvmAtomicCmpxchgOp {
     fn convert(
         &self,

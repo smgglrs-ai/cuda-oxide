@@ -115,6 +115,7 @@ pub fn translate_terminator(
 ) -> TranslationResult<Ptr<Operation>> {
     let loc = span_to_location(ctx, term.source_info.span);
 
+
     match &term.kind {
         mir::TerminatorKind::Return => {
             translate_return(ctx, body, value_map, block_ptr, prev_op, loc)

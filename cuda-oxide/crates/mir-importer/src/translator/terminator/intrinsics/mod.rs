@@ -55,6 +55,7 @@ pub mod indexing;
 pub mod integer_minmax;
 pub mod layout;
 pub mod memory;
+pub mod mma_sync;
 pub mod saturating;
 pub mod tma;
 pub mod wgmma;
