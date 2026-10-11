@@ -15,20 +15,20 @@ mod kernels {
 
         let lane = cuda_device::thread::threadIdx_x() as usize;
 
-        // Load A: only cols 0-7 have value 1.0, cols 8-15 are 0.0
-        // This tests that reg0/reg1 (K=0..7) contribute to the result
-        // while reg2/reg3 (K=8..15) contribute nothing.
+        // A = identity 16x16, B[n,k] = n*100+k
+        // Expected: D[m,n] = B_mma[m,n] = B_orig[n,m] = n*100+m
         let mut i = lane;
         while i < 256 {
+            let r = i / 16;
             let c = i % 16;
-            unsafe { A_SM[i] = 1.0; }
+            unsafe { A_SM[i] = if r == c { 1.0 } else { 0.0 }; }
             i += 32;
         }
         i = lane;
         while i < 128 {
             let n = i / 16;
             let k = i % 16;
-            unsafe { B_SM[i] = ((n * 41 + k * 11 + 5) % 89) as f32 * 0.1; }
+            unsafe { B_SM[i] = (n * 100 + k) as f32; }
             i += 32;
         }
         cuda_device::thread::sync_threads();
@@ -60,21 +60,20 @@ mod kernels {
             //   reg2 = {a4,a5} = A[groupID,   tid*2+8], A[groupID,   tid*2+9]
             //   reg3 = {a6,a7} = A[groupID+8, tid*2+8], A[groupID+8, tid*2+9]
             a_frag = [
-                pack_f16x2(A_SM[r0 * 16 + tid * 2],     A_SM[r0 * 16 + tid * 2 + 1]),     // {a0,a1}
-                pack_f16x2(A_SM[r1 * 16 + tid * 2],     A_SM[r1 * 16 + tid * 2 + 1]),     // {a2,a3}
-                pack_f16x2(A_SM[r0 * 16 + tid * 2 + 8], A_SM[r0 * 16 + tid * 2 + 9]),    // {a4,a5}
-                pack_f16x2(A_SM[r1 * 16 + tid * 2 + 8], A_SM[r1 * 16 + tid * 2 + 9]),    // {a6,a7}
+                pack_f16x2(A_SM[r0 * 16 + tid * 2 + 1], A_SM[r0 * 16 + tid * 2]),         // {a0,a1} swapped
+                pack_f16x2(A_SM[r1 * 16 + tid * 2 + 1], A_SM[r1 * 16 + tid * 2]),         // {a2,a3} swapped
+                pack_f16x2(A_SM[r0 * 16 + tid * 2 + 9], A_SM[r0 * 16 + tid * 2 + 8]),    // {a4,a5} swapped
+                pack_f16x2(A_SM[r1 * 16 + tid * 2 + 9], A_SM[r1 * 16 + tid * 2 + 8]),    // {a6,a7} swapped
             ];
         }
 
-        // Pack B fragments (n=groupID for first 8 output cols)
+        // B fragment with SWAPPED pack order (hi, lo instead of lo, hi)
         let b_frag: [u32; 2];
         unsafe {
-            // Try: B fragment uses tid for col, groupID*2 for row (swapped roles)
-            let n = tid;
+            let n = group_id;
             b_frag = [
-                pack_f16x2(B_SM[n * 16 + group_id * 2], B_SM[n * 16 + group_id * 2 + 1]),
-                pack_f16x2(B_SM[n * 16 + group_id * 2 + 8], B_SM[n * 16 + group_id * 2 + 9]),
+                pack_f16x2(B_SM[n * 16 + tid * 2 + 1], B_SM[n * 16 + tid * 2]),
+                pack_f16x2(B_SM[n * 16 + tid * 2 + 9], B_SM[n * 16 + tid * 2 + 8]),
             ];
         }
 
@@ -139,8 +138,8 @@ fn main() {
         for n in 0..8 {
             let mut sum = 0.0f32;
             for k in 0..16 {
-                let a = 1.0f32;
-                let b = ((n * 41 + k * 11 + 5) % 89) as f32 * 0.1;
+                let a = if m == k { 1.0f32 } else { 0.0 };
+                let b = (n * 100 + k) as f32;
                 sum += a * b;
             }
             d_cpu[m * 8 + n] = sum;
@@ -157,8 +156,7 @@ fn main() {
             max_reldiff = max_reldiff.max(diff / d_cpu[i].abs());
         }
     }
-    // Print first 4 rows
-    for r in 0..4 {
+    for r in 0..8 {
         print!("  row {r:2}: CPU=[");
         for c in 0..8 { print!("{:7.2}", d_cpu[r*8+c]); }
         print!("]  GPU=[");
